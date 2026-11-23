@@ -1,143 +1,34 @@
-<!doctype html>
-<html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Dr. Muskel Coach V13 – Ellenbogenanimation</title>
-<style>
-*{box-sizing:border-box}body{margin:0;background:#0b121b;color:#e9f2fa;font:15px system-ui,sans-serif}
-header,main{padding:12px 16px;max-width:920px;margin:auto}h1{font-size:21px;margin:0 0 5px}
-#view{height:48vh;min-height:300px;touch-action:none}button,select{font:inherit;background:#24394c;color:white;border:1px solid #587184;border-radius:8px;padding:10px;min-height:43px}
-.row{display:flex;gap:9px;flex-wrap:wrap;align-items:center;margin:10px 0}
-#log{white-space:pre-wrap;overflow-wrap:anywhere;background:#162433;border:1px solid #38536a;border-radius:9px;padding:13px;font:12px/1.55 ui-monospace,monospace}
-#status{color:#b9d3e5}label{display:flex;align-items:center;gap:6px}input{accent-color:#f46d70}
-</style>
-<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"}}</script>
-</head><body><header><h1>Dr. Muskel Coach V13</h1><div id="status">Lade 3D-Grundmodell …</div></header>
-<div id="view"></div>
-<main><div class="row">
-<label>Arm-Knochen <select id="bone"></select></label>
-<label><input id="skeleton" type="checkbox" checked>Knochenlinien</label>
-<button id="front">Vorne</button><button id="side">Seite</button>
-<button id="copy">Diagnose kopieren</button><button id="play">▶ Animation starten</button><button id="reset">Ruhepose</button>
-</div><div class="row"><label>Beugung <input id="angle" type="range" min="0" max="105" value="0" step="1"></label><strong id="degrees">0°</strong><label><input id="left" type="checkbox" checked>Links</label><label><input id="right" type="checkbox" checked>Rechts</label></div>
-<p>V13 animiert die beiden Unterarme anhand ihrer echten Gelenkpositionen. Die Scharnierachse wird aus den Knochenpositionen berechnet. Die anatomische Korrektheit muss visuell geprüft werden.</p>
-<pre id="log">Warte auf Grundmodell …</pre>
-</main>
+<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Dr. Muskel Coach V14 – Bankdrücken</title>
+<style>*{box-sizing:border-box}body{margin:0;background:#0b121b;color:#eef4fb;font:15px system-ui,sans-serif}header,main{max-width:950px;margin:auto;padding:12px 15px}h1{font-size:22px;margin:0 0 5px}#view{height:56vh;min-height:340px;touch-action:none}button{background:#24394c;color:white;border:1px solid #55758a;border-radius:8px;padding:11px 14px;font:inherit}button.primary{background:#b72d40}button:active{transform:scale(.98)}.row{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin:12px 0}input{accent-color:#ee6473}#status{color:#b9d1e5}#note{color:#aebfd0;line-height:1.5}#debug{white-space:pre-wrap;background:#172634;border:1px solid #3c5467;border-radius:9px;padding:12px;font:12px/1.5 monospace}</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"}}</script></head><body><header><h1>Dr. Muskel Coach V14 – Bankdrücken</h1><div id="status">Lade Grundmodell …</div></header><div id="view"></div><main>
+<div class="row"><button class="primary" id="play">▶ Bewegung starten</button><button id="reset">Zurücksetzen</button><button id="top">Draufsicht</button><button id="side">Seitenansicht</button><label><input type="checkbox" id="bones">Knochenlinien</label></div>
+<div class="row"><label>Wiederholung <input id="progress" type="range" min="0" max="100" value="0" style="width:min(55vw,350px)"></label><strong id="pct">0 %</strong><label><input id="bar" type="checkbox" checked>Langhantel</label><label><input id="bench" type="checkbox" checked>Trainingsbank</label></div>
+<p id="note">Erster Bankdrücken-Prototyp: Rückenlage, Bank, Langhantel und animierte Unterarme. Die Hantelbahn ist vorläufig und die Hände sind noch nicht per inverser Kinematik an der Stange fixiert. Das rote Muskelmodell ist weiterhin nicht geriggt.</p>
+<pre id="debug">Warte auf base.glb …</pre></main>
 <script type="module">
-import * as THREE from 'three';
-import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
-import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
-const $=id=>document.getElementById(id);
-const scene=new THREE.Scene();scene.background=new THREE.Color('#0b121b');
-const camera=new THREE.PerspectiveCamera(40,1,.01,500);
-const renderer=new THREE.WebGLRenderer({antialias:true});
-renderer.setPixelRatio(Math.min(devicePixelRatio,2));
-$('view').appendChild(renderer.domElement);
-scene.add(new THREE.HemisphereLight(0xffffff,0x526078,2.3));
-const light=new THREE.DirectionalLight(0xffffff,2);light.position.set(3,6,8);scene.add(light);
+import * as THREE from 'three';import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+const $=id=>document.getElementById(id),scene=new THREE.Scene();scene.background=new THREE.Color('#0b121b');
+const camera=new THREE.PerspectiveCamera(42,1,.01,100);const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));$('view').appendChild(renderer.domElement);
+scene.add(new THREE.HemisphereLight(0xffffff,0x465b78,2.4));const sun=new THREE.DirectionalLight(0xffffff,2.2);sun.position.set(3,7,5);scene.add(sun);
 const controls=new OrbitControls(camera,renderer.domElement);controls.enableDamping=true;
-let model,helper,bones=[],meshes=[],diagnosis='',playing=false,phase=0,lastTime=0;const hinges=[];
-function pos(o){return o.getWorldPosition(new THREE.Vector3())}
-function vec(v){return `(${v.x.toFixed(3)}, ${v.y.toFixed(3)}, ${v.z.toFixed(3)})`}
-function fit(){
-if(!model)return;
-const box=new THREE.Box3().setFromObject(model),center=box.getCenter(new THREE.Vector3()),size=box.getSize(new THREE.Vector3());
-const d=Math.max(size.x,size.y,size.z)*1.7;
-controls.target.copy(center);camera.position.copy(center).add(new THREE.Vector3(0,0,d));camera.near=.01;camera.far=1000;camera.updateProjectionMatrix();controls.update();
-}
-function analyze(){
-if(!model)return;
-model.updateMatrixWorld(true);
-const name=$('bone').value;
-const bone=bones.find(b=>b.name===name);
-if(!bone)return;
-const p=pos(bone);
-const parents=[];let a=bone.parent;while(a&&parents.length<9){parents.push(`${a.name||'(ohne Name)'}${a.isBone?' [Bone]':''}`);a=a.parent}
-const children=bone.children.filter(c=>c.isBone);
-const local=bone.position.clone();
-const childLines=children.map(c=>`  ${c.name} | lokal ${vec(c.position)} | Welt ${vec(pos(c))} | Abstand ${pos(c).distanceTo(p).toFixed(3)}`);
-const lines=[
-`Ausgewählt: ${bone.name}`,
-`Knochen insgesamt: ${bones.length}`,
-`SkinnedMeshes: ${meshes.length}`,
-`Elternkette: ${parents.join(' ← ')}`,
-`Position lokal: ${vec(local)}`,
-`Position Welt: ${vec(p)}`,
-`Quaternion lokal: (${bone.quaternion.toArray().map(x=>x.toFixed(4)).join(', ')})`,
-`Kinder (${children.length}):`,
-...childLines,
-'',
-'Skinning-Einfluss (Vertexgewichte des ausgewählten Knochens):'
-];
-let total=0;
-for(const mesh of meshes){
-const idx=mesh.skeleton.bones.indexOf(bone);
-if(idx<0)continue;
-const weights=mesh.geometry.getAttribute('skinWeight'),indices=mesh.geometry.getAttribute('skinIndex');
-if(!weights||!indices)continue;
-let count=0,weightSum=0;
-for(let i=0;i<weights.count;i++){
-for(let k=0;k<4;k++){if(indices.getComponent(i,k)===idx){const w=weights.getComponent(i,k);if(w>0.01){count++;weightSum+=w}}}
-}
-if(count){total+=count;lines.push(`  ${mesh.name||'(Mesh)'}: ${count} gewichtete Vertices; Summe ${weightSum.toFixed(1)}`)}
-}
-if(!total)lines.push('  Kein Einfluss > 0,01 auf untersuchte Mesh-Vertices gefunden.');
-lines.push('','ARMKNOCHEN UND DIREKTE ELTERN:');
-for(const b of bones.filter(b=>/upperarm|lowerarm/i.test(b.name))){
-lines.push(`  ${b.name} ← ${b.parent?.name||'?'} | ${vec(pos(b))}`);
-}
-diagnosis=lines.join('\n');$('log').textContent=diagnosis;
-}
-new GLTFLoader().load('./base.glb',g=>{
-model=g.scene;scene.add(model);
-model.traverse(o=>{if(o.isBone)bones.push(o);if(o.isSkinnedMesh)meshes.push(o)});
-model.updateMatrixWorld(true);
-helper=new THREE.SkeletonHelper(model);helper.visible=$('skeleton').checked;scene.add(helper);
-const arm=bones.filter(b=>/upperarm|lowerarm/i.test(b.name));
-for(const b of arm){const opt=document.createElement('option');opt.value=b.name;opt.textContent=b.name;$('bone').append(opt)}
-if(!arm.length){for(const b of bones.slice(0,30)){const opt=document.createElement('option');opt.value=b.name;opt.textContent=b.name;$('bone').append(opt)}}
-$('bone').value=arm.find(b=>/lowerarm01L/i.test(b.name))?.name||arm[0]?.name||bones[0]?.name||'';
-$('status').textContent=`Grundmodell geladen · ${bones.length} Knochen · ${meshes.length} SkinnedMeshes · ${arm.length} Armknochen`;
-fit();analyze();setupHinges();
-},undefined,e=>{$('status').textContent='Fehler beim Laden von base.glb';$('log').textContent=String(e?.message||e)+'\nPrüfe, ob base.glb im selben GitHub-Ordner wie index.html liegt.'});
-function setupHinges(){
- model.updateMatrixWorld(true);
- for(const side of ['L','R']){
-  const b=bones.find(x=>x.name==='lowerarm01'+side);
-  const upper=bones.find(x=>x.name==='upperarm02'+side);
-  const tip=bones.find(x=>x.name==='lowerarm02'+side);
-  if(!b||!upper||!tip)continue;
-  const elbow=pos(b), shoulder=pos(upper), wrist=pos(tip);
-  const upperDir=elbow.clone().sub(shoulder).normalize();
-  const foreDir=wrist.clone().sub(elbow).normalize();
-  let axisWorld=new THREE.Vector3().crossVectors(upperDir,foreDir).normalize();
-  // Der lokale Unterarmknochen rotiert relativ zur Weltorientierung seines Elternknochens.
-  const parentWorldQ=upper.getWorldQuaternion(new THREE.Quaternion());
-  const axisLocal=axisWorld.clone().applyQuaternion(parentWorldQ.clone().invert()).normalize();
-  hinges.push({side,b,rest:b.quaternion.clone(),axisLocal,upperDir,foreDir});
- }
- const old=$('status').textContent;
- $('status').textContent=old+` · ${hinges.length} Ellenbogengelenke bereit`;
-}
-function setAngle(deg){
- $('angle').value=String(Math.round(deg));$('degrees').textContent=Math.round(deg)+'°';
- for(const h of hinges){
-  const enabled=$(h.side==='L'?'left':'right').checked;
-  // Die Rotation wird auf die unveränderte Bind-Pose angewandt.
-  const rotation=new THREE.Quaternion().setFromAxisAngle(h.axisLocal,THREE.MathUtils.degToRad(enabled?deg:0));
-  h.b.quaternion.copy(rotation.multiply(h.rest));
- }
- if(model)model.updateMatrixWorld(true);
-}
-$('angle').oninput=()=>{playing=false;$('play').textContent='▶ Animation starten';setAngle(Number($('angle').value))};
-$('left').onchange=$('right').onchange=()=>setAngle(Number($('angle').value));
-$('play').onclick=()=>{playing=!playing;$('play').textContent=playing?'⏸ Animation pausieren':'▶ Animation starten';lastTime=performance.now()};
-$('reset').onclick=()=>{playing=false;$('play').textContent='▶ Animation starten';setAngle(0)};
-
-$('bone').onchange=analyze;
-$('skeleton').onchange=()=>{if(helper)helper.visible=$('skeleton').checked};
-$('front').onclick=fit;
-$('side').onclick=()=>{fit();const d=camera.position.distanceTo(controls.target);camera.position.copy(controls.target).add(new THREE.Vector3(d,0,0));controls.update()};
-$('copy').onclick=async()=>{try{await navigator.clipboard.writeText(diagnosis);$('status').textContent='Diagnose kopiert – hier im Chat einfügen.'}catch(e){$('status').textContent='Kopieren blockiert: Diagnose unten markieren und kopieren.'}};
-function resize(){const w=$('view').clientWidth,h=$('view').clientHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix()}
-new ResizeObserver(resize).observe($('view'));resize();
-renderer.setAnimationLoop((t)=>{if(playing&&hinges.length){const dt=Math.min((t-lastTime)/1000,.1);phase+=dt*1.6;setAngle((1-Math.cos(phase))*52.5)}lastTime=t;controls.update();renderer.render(scene,camera)});
+const equipment=new THREE.Group();scene.add(equipment);const bench=new THREE.Group(),barbell=new THREE.Group();equipment.add(bench,barbell);
+function cub(w,h,d,color,x,y,z){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),new THREE.MeshStandardMaterial({color,roughness:.6,metalness:.1}));m.position.set(x,y,z);bench.add(m);return m}
+function cyl(radius,length,color){const m=new THREE.Mesh(new THREE.CylinderGeometry(radius,radius,length,16),new THREE.MeshStandardMaterial({color,metalness:.75,roughness:.28}));m.rotation.z=Math.PI/2;barbell.add(m);return m}
+cub(.67,.11,1.2,0x263a50,0,.62,-1.13);cub(.4,.13,.43,0x263a50,0,.61,-1.89);cub(.07,.58,.07,0x7b8996,-.22,.30,-1.03);cub(.07,.58,.07,0x7b8996,.22,.30,-1.03);cub(.07,.58,.07,0x7b8996,-.22,.30,-1.60);cub(.07,.58,.07,0x7b8996,.22,.30,-1.60);
+cyl(.022,2.05,0xbfc9d1);for(const x of [-.88,.88]){const disk=cyl(.16,.055,0x222c38);disk.position.x=x;const disk2=cyl(.11,.045,0x485d6d);disk2.position.x=x+(x>0?.06:-.06)}
+let model,helper,hinges=[],playing=false,last=0,phase=0;const tempQ=new THREE.Quaternion();
+function wp(o){return o.getWorldPosition(new THREE.Vector3())}
+function setup(){const map=new Map();model.traverse(o=>{if(o.isBone)map.set(o.name,o)});model.updateMatrixWorld(true);for(const side of ['L','R']){const b=map.get('lowerarm01'+side),upper=map.get('upperarm02'+side),tip=map.get('lowerarm02'+side);if(!b||!upper||!tip)continue;const a=wp(b).sub(wp(upper)).normalize(),f=wp(tip).sub(wp(b)).normalize();let axis=new THREE.Vector3().crossVectors(a,f);if(axis.length()<.01)axis.set(0,0,1);axis.normalize();axis.applyQuaternion(upper.getWorldQuaternion(new THREE.Quaternion()).invert()).normalize();hinges.push({b,rest:b.quaternion.clone(),axis});}
+helper=new THREE.SkeletonHelper(model);helper.visible=false;scene.add(helper);$('status').textContent=`Grundmodell geladen · ${map.size} Knochen · ${hinges.length} Ellenbogen aktiv`;
+$('debug').textContent=`V14 Prototyp geladen\nEllenbogengelenke: ${hinges.length}/2\nModell: Rückenlage\nLanghantel: einfache vertikale Bahn\nHinweis: Noch keine echte Griffbindung / Schulterkinematik.`;setProgress(0);}
+function setProgress(v){const n=Math.max(0,Math.min(100,Number(v)));$('progress').value=n;$('pct').textContent=Math.round(n)+' %';const f=(1-Math.cos(n/100*Math.PI*2))/2;
+for(const h of hinges){const q=new THREE.Quaternion().setFromAxisAngle(h.axis,THREE.MathUtils.degToRad(f*90));h.b.quaternion.copy(q.multiply(h.rest));}
+barbell.position.set(0,1.27+f*.30,-1.31);if(model)model.updateMatrixWorld(true);}
+new GLTFLoader().load('./base.glb',g=>{model=g.scene;scene.add(model);model.rotation.x=-Math.PI/2;model.position.y=.82;setup();setCamera('side');},undefined,e=>{$('status').textContent='Ladefehler: base.glb';$('debug').textContent=String(e?.message||e)+'\nbase.glb muss neben index.html liegen.'});
+function setCamera(mode){const target=new THREE.Vector3(0,.75,-1.05);controls.target.copy(target);camera.position.copy(target).add(mode==='top'?new THREE.Vector3(.25,3.8,.35):new THREE.Vector3(3.2,1.7,2.7));controls.update();}
+$('side').onclick=()=>setCamera('side');$('top').onclick=()=>setCamera('top');$('bench').onchange=()=>bench.visible=$('bench').checked;$('bar').onchange=()=>barbell.visible=$('bar').checked;$('bones').onchange=()=>{if(helper)helper.visible=$('bones').checked};
+$('progress').oninput=()=>{playing=false;$('play').textContent='▶ Bewegung starten';setProgress($('progress').value)};
+$('play').onclick=()=>{playing=!playing;$('play').textContent=playing?'⏸ Pausieren':'▶ Bewegung starten';last=performance.now()};$('reset').onclick=()=>{playing=false;$('play').textContent='▶ Bewegung starten';phase=0;setProgress(0)};
+function resize(){const w=$('view').clientWidth,h=$('view').clientHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix()}new ResizeObserver(resize).observe($('view'));resize();setCamera('side');
+renderer.setAnimationLoop(t=>{if(playing&&model){phase+=Math.min((t-last)/1000,.05)*.65;setProgress((phase%1)*100)}last=t;controls.update();renderer.render(scene,camera)});
 </script></body></html>
