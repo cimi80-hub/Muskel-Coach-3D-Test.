@@ -16,9 +16,7 @@ Knochen gesamt: ${allBones.length}
 Armknochen: ${entries.length}
 SkinnedMeshes: ${[...new Set(skinReport.map(x=>x.mesh))].length}
 
-`+rows.join('
-
-');report()}
+`+rows.join('\n\n');report()}
 function scanSkin(){skinReport=[];base.traverse(o=>{if(!o.isSkinnedMesh||!o.skeleton)return;const attr=o.geometry.getAttribute('skinIndex'),weight=o.geometry.getAttribute('skinWeight');if(!attr||!weight)return;for(const e of entries){const indices=[];o.skeleton.bones.forEach((b,i)=>{if(b===e.bone)indices.push(i)});if(!indices.length)continue;let count=0;for(let i=0;i<attr.count;i++){for(let k=0;k<4;k++){if(indices.includes(attr.getComponent(i,k))&&weight.getComponent(i,k)>.01){count++;break}}}skinReport.push({mesh:o.name||'(unbenannt)',bone:e.bone.name,vertices:count})}})}
 function report(){const name=$('boneChoice').value;const chosen=entries.find(x=>x.bone.uuid===name);$('log').textContent=`Ausgewählt: ${chosen?.bone.name||'kein Knochen'}
 Testwinkel: ${$('angle').value}°
