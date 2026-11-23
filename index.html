@@ -1,9 +1,9 @@
-<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Dr. Muskel Coach V14 – Bankdrücken</title>
+<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Dr. Muskel Coach V15 – Bankdrücken mit IK</title>
 <style>*{box-sizing:border-box}body{margin:0;background:#0b121b;color:#eef4fb;font:15px system-ui,sans-serif}header,main{max-width:950px;margin:auto;padding:12px 15px}h1{font-size:22px;margin:0 0 5px}#view{height:56vh;min-height:340px;touch-action:none}button{background:#24394c;color:white;border:1px solid #55758a;border-radius:8px;padding:11px 14px;font:inherit}button.primary{background:#b72d40}button:active{transform:scale(.98)}.row{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin:12px 0}input{accent-color:#ee6473}#status{color:#b9d1e5}#note{color:#aebfd0;line-height:1.5}#debug{white-space:pre-wrap;background:#172634;border:1px solid #3c5467;border-radius:9px;padding:12px;font:12px/1.5 monospace}</style>
-<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"}}</script></head><body><header><h1>Dr. Muskel Coach V14 – Bankdrücken</h1><div id="status">Lade Grundmodell …</div></header><div id="view"></div><main>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"}}</script></head><body><header><h1>Dr. Muskel Coach V15 – Bankdrücken mit IK</h1><div id="status">Lade Grundmodell …</div></header><div id="view"></div><main>
 <div class="row"><button class="primary" id="play">▶ Bewegung starten</button><button id="reset">Zurücksetzen</button><button id="top">Draufsicht</button><button id="side">Seitenansicht</button><label><input type="checkbox" id="bones">Knochenlinien</label></div>
 <div class="row"><label>Wiederholung <input id="progress" type="range" min="0" max="100" value="0" style="width:min(55vw,350px)"></label><strong id="pct">0 %</strong><label><input id="bar" type="checkbox" checked>Langhantel</label><label><input id="bench" type="checkbox" checked>Trainingsbank</label></div>
-<p id="note">Erster Bankdrücken-Prototyp: Rückenlage, Bank, Langhantel und animierte Unterarme. Die Hantelbahn ist vorläufig und die Hände sind noch nicht per inverser Kinematik an der Stange fixiert. Das rote Muskelmodell ist weiterhin nicht geriggt.</p>
+<p id="note">V15-Test: Die Langhantel gibt zwei Griffziele vor. Ein iterativer IK-Löser richtet Schulter und Ellenbogen auf diese Ziele aus. Die korrekte Griffhaltung und anatomische Genauigkeit müssen visuell überprüft werden. Das rote Muskelmodell ist weiterhin nicht geriggt.</p>
 <pre id="debug">Warte auf base.glb …</pre></main>
 <script type="module">
 import * as THREE from 'three';import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
@@ -16,14 +16,71 @@ function cub(w,h,d,color,x,y,z){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h
 function cyl(radius,length,color){const m=new THREE.Mesh(new THREE.CylinderGeometry(radius,radius,length,16),new THREE.MeshStandardMaterial({color,metalness:.75,roughness:.28}));m.rotation.z=Math.PI/2;barbell.add(m);return m}
 cub(.67,.11,1.2,0x263a50,0,.62,-1.13);cub(.4,.13,.43,0x263a50,0,.61,-1.89);cub(.07,.58,.07,0x7b8996,-.22,.30,-1.03);cub(.07,.58,.07,0x7b8996,.22,.30,-1.03);cub(.07,.58,.07,0x7b8996,-.22,.30,-1.60);cub(.07,.58,.07,0x7b8996,.22,.30,-1.60);
 cyl(.022,2.05,0xbfc9d1);for(const x of [-.88,.88]){const disk=cyl(.16,.055,0x222c38);disk.position.x=x;const disk2=cyl(.11,.045,0x485d6d);disk2.position.x=x+(x>0?.06:-.06)}
-let model,helper,hinges=[],playing=false,last=0,phase=0;const tempQ=new THREE.Quaternion();
+let model,helper,chains=[],playing=false,last=0,phase=0,baseBarY=1.27,barZ=-1.31;
 function wp(o){return o.getWorldPosition(new THREE.Vector3())}
-function setup(){const map=new Map();model.traverse(o=>{if(o.isBone)map.set(o.name,o)});model.updateMatrixWorld(true);for(const side of ['L','R']){const b=map.get('lowerarm01'+side),upper=map.get('upperarm02'+side),tip=map.get('lowerarm02'+side);if(!b||!upper||!tip)continue;const a=wp(b).sub(wp(upper)).normalize(),f=wp(tip).sub(wp(b)).normalize();let axis=new THREE.Vector3().crossVectors(a,f);if(axis.length()<.01)axis.set(0,0,1);axis.normalize();axis.applyQuaternion(upper.getWorldQuaternion(new THREE.Quaternion()).invert()).normalize();hinges.push({b,rest:b.quaternion.clone(),axis});}
-helper=new THREE.SkeletonHelper(model);helper.visible=false;scene.add(helper);$('status').textContent=`Grundmodell geladen · ${map.size} Knochen · ${hinges.length} Ellenbogen aktiv`;
-$('debug').textContent=`V14 Prototyp geladen\nEllenbogengelenke: ${hinges.length}/2\nModell: Rückenlage\nLanghantel: einfache vertikale Bahn\nHinweis: Noch keine echte Griffbindung / Schulterkinematik.`;setProgress(0);}
-function setProgress(v){const n=Math.max(0,Math.min(100,Number(v)));$('progress').value=n;$('pct').textContent=Math.round(n)+' %';const f=(1-Math.cos(n/100*Math.PI*2))/2;
-for(const h of hinges){const q=new THREE.Quaternion().setFromAxisAngle(h.axis,THREE.MathUtils.degToRad(f*90));h.b.quaternion.copy(q.multiply(h.rest));}
-barbell.position.set(0,1.27+f*.30,-1.31);if(model)model.updateMatrixWorld(true);}
+function setup(){
+const map=new Map();model.traverse(o=>{if(o.isBone)map.set(o.name,o)});
+model.updateMatrixWorld(true);
+for(const side of ['L','R']){
+const shoulder=map.get('upperarm01'+side),upper=map.get('upperarm02'+side),elbow=map.get('lowerarm01'+side),forearm=map.get('lowerarm02'+side);
+if(!shoulder||!upper||!elbow||!forearm)continue;
+let hand=forearm;
+const descendants=[];forearm.traverse(o=>{if(o.isBone&&o!==forearm)descendants.push(o)});
+hand=descendants.find(o=>/hand|wrist/i.test(o.name))||descendants.find(o=>/palm/i.test(o.name))||forearm;
+const tipLocal=hand===forearm?new THREE.Vector3(0,.12,0):new THREE.Vector3();
+chains.push({side,shoulder,upper,elbow,forearm,hand,tipLocal,joints:[elbow,upper,shoulder],rest:[elbow,upper,shoulder].map(b=>b.quaternion.clone())});
+}
+helper=new THREE.SkeletonHelper(model);helper.visible=false;scene.add(helper);
+const shoulders=chains.map(c=>wp(c.shoulder));
+if(shoulders.length===2){
+const mid=shoulders[0].clone().add(shoulders[1]).multiplyScalar(.5);
+barZ=mid.z-.04;
+baseBarY=Math.max(mid.y+.13,.92);
+}
+$('status').textContent=`Grundmodell geladen · ${map.size} Knochen · ${chains.length} IK-Arme bereit`;
+$('debug').textContent=`V15 IK-Test geladen\nArmketten: ${chains.length}/2\nGriffziele: links und rechts\nIK: iterativer CCD-Löser mit Schulter- und Ellenbogengelenken\nHinweis: Position und Greifhaltung müssen visuell überprüft werden.`;
+setProgress(0);
+}
+function endpoint(c){return c.hand.localToWorld(c.tipLocal.clone())}
+function rotateJointToward(joint,end,target,maxAngle){
+model.updateMatrixWorld(true);
+const pivot=wp(joint),a=end.clone().sub(pivot),b=target.clone().sub(pivot);
+if(a.lengthSq()<1e-8||b.lengthSq()<1e-8)return;
+a.normalize();b.normalize();
+const angle=Math.min(a.angleTo(b),maxAngle);
+if(angle<1e-5)return;
+const axis=new THREE.Vector3().crossVectors(a,b);
+if(axis.lengthSq()<1e-10)return;
+axis.normalize();
+const parentQ=joint.parent.getWorldQuaternion(new THREE.Quaternion());
+const localAxis=axis.applyQuaternion(parentQ.invert()).normalize();
+const q=new THREE.Quaternion().setFromAxisAngle(localAxis,angle);
+joint.quaternion.premultiply(q);
+joint.updateMatrixWorld(true);
+}
+function solve(c,target){
+for(let i=0;i<c.joints.length;i++)c.joints[i].quaternion.copy(c.rest[i]);
+model.updateMatrixWorld(true);
+for(let iter=0;iter<18;iter++){
+for(const j of c.joints)rotateJointToward(j,endpoint(c),target,.18);
+if(endpoint(c).distanceTo(target)<.008)break;
+}
+}
+function setProgress(v){
+const n=Math.max(0,Math.min(100,Number(v)));$('progress').value=n;$('pct').textContent=Math.round(n)+' %';
+const f=(1-Math.cos(n/100*Math.PI*2))/2;
+const y=baseBarY+f*.27;
+barbell.position.set(0,y,barZ);
+if(model&&chains.length){
+for(const c of chains){
+const shoulder=wp(c.shoulder);
+const x=shoulder.x+(c.side==='L'?.13:-.13);
+const target=new THREE.Vector3(x,y,barZ);
+solve(c,target);
+}
+model.updateMatrixWorld(true);
+}
+}
 new GLTFLoader().load('./base.glb',g=>{model=g.scene;scene.add(model);model.rotation.x=-Math.PI/2;model.position.y=.82;setup();setCamera('side');},undefined,e=>{$('status').textContent='Ladefehler: base.glb';$('debug').textContent=String(e?.message||e)+'\nbase.glb muss neben index.html liegen.'});
 function setCamera(mode){const target=new THREE.Vector3(0,.75,-1.05);controls.target.copy(target);camera.position.copy(target).add(mode==='top'?new THREE.Vector3(.25,3.8,.35):new THREE.Vector3(3.2,1.7,2.7));controls.update();}
 $('side').onclick=()=>setCamera('side');$('top').onclick=()=>setCamera('top');$('bench').onchange=()=>bench.visible=$('bench').checked;$('bar').onchange=()=>barbell.visible=$('bar').checked;$('bones').onchange=()=>{if(helper)helper.visible=$('bones').checked};
