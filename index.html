@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Dr. Muskel Coach V12 – Skelettanalyse</title>
+<title>Dr. Muskel Coach V13 – Ellenbogenanimation</title>
 <style>
 *{box-sizing:border-box}body{margin:0;background:#0b121b;color:#e9f2fa;font:15px system-ui,sans-serif}
 header,main{padding:12px 16px;max-width:920px;margin:auto}h1{font-size:21px;margin:0 0 5px}
@@ -10,15 +10,15 @@ header,main{padding:12px 16px;max-width:920px;margin:auto}h1{font-size:21px;marg
 #status{color:#b9d3e5}label{display:flex;align-items:center;gap:6px}input{accent-color:#f46d70}
 </style>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"}}</script>
-</head><body><header><h1>Dr. Muskel Coach V12</h1><div id="status">Lade 3D-Grundmodell …</div></header>
+</head><body><header><h1>Dr. Muskel Coach V13</h1><div id="status">Lade 3D-Grundmodell …</div></header>
 <div id="view"></div>
 <main><div class="row">
 <label>Arm-Knochen <select id="bone"></select></label>
 <label><input id="skeleton" type="checkbox" checked>Knochenlinien</label>
 <button id="front">Vorne</button><button id="side">Seite</button>
-<button id="copy">Diagnose kopieren</button>
-</div>
-<p>V12 liest die tatsächliche Knochenhierarchie und die Skinning-Einflüsse aus <code>base.glb</code>. Die Analyse verändert keine Knochen.</p>
+<button id="copy">Diagnose kopieren</button><button id="play">▶ Animation starten</button><button id="reset">Ruhepose</button>
+</div><div class="row"><label>Beugung <input id="angle" type="range" min="0" max="105" value="0" step="1"></label><strong id="degrees">0°</strong><label><input id="left" type="checkbox" checked>Links</label><label><input id="right" type="checkbox" checked>Rechts</label></div>
+<p>V13 animiert die beiden Unterarme anhand ihrer echten Gelenkpositionen. Die Scharnierachse wird aus den Knochenpositionen berechnet. Die anatomische Korrektheit muss visuell geprüft werden.</p>
 <pre id="log">Warte auf Grundmodell …</pre>
 </main>
 <script type="module">
@@ -34,7 +34,7 @@ $('view').appendChild(renderer.domElement);
 scene.add(new THREE.HemisphereLight(0xffffff,0x526078,2.3));
 const light=new THREE.DirectionalLight(0xffffff,2);light.position.set(3,6,8);scene.add(light);
 const controls=new OrbitControls(camera,renderer.domElement);controls.enableDamping=true;
-let model,helper,bones=[],meshes=[],diagnosis='';
+let model,helper,bones=[],meshes=[],diagnosis='',playing=false,phase=0,lastTime=0;const hinges=[];
 function pos(o){return o.getWorldPosition(new THREE.Vector3())}
 function vec(v){return `(${v.x.toFixed(3)}, ${v.y.toFixed(3)}, ${v.z.toFixed(3)})`}
 function fit(){
@@ -96,8 +96,42 @@ for(const b of arm){const opt=document.createElement('option');opt.value=b.name;
 if(!arm.length){for(const b of bones.slice(0,30)){const opt=document.createElement('option');opt.value=b.name;opt.textContent=b.name;$('bone').append(opt)}}
 $('bone').value=arm.find(b=>/lowerarm01L/i.test(b.name))?.name||arm[0]?.name||bones[0]?.name||'';
 $('status').textContent=`Grundmodell geladen · ${bones.length} Knochen · ${meshes.length} SkinnedMeshes · ${arm.length} Armknochen`;
-fit();analyze();
+fit();analyze();setupHinges();
 },undefined,e=>{$('status').textContent='Fehler beim Laden von base.glb';$('log').textContent=String(e?.message||e)+'\nPrüfe, ob base.glb im selben GitHub-Ordner wie index.html liegt.'});
+function setupHinges(){
+ model.updateMatrixWorld(true);
+ for(const side of ['L','R']){
+  const b=bones.find(x=>x.name==='lowerarm01'+side);
+  const upper=bones.find(x=>x.name==='upperarm02'+side);
+  const tip=bones.find(x=>x.name==='lowerarm02'+side);
+  if(!b||!upper||!tip)continue;
+  const elbow=pos(b), shoulder=pos(upper), wrist=pos(tip);
+  const upperDir=elbow.clone().sub(shoulder).normalize();
+  const foreDir=wrist.clone().sub(elbow).normalize();
+  let axisWorld=new THREE.Vector3().crossVectors(upperDir,foreDir).normalize();
+  // Der lokale Unterarmknochen rotiert relativ zur Weltorientierung seines Elternknochens.
+  const parentWorldQ=upper.getWorldQuaternion(new THREE.Quaternion());
+  const axisLocal=axisWorld.clone().applyQuaternion(parentWorldQ.clone().invert()).normalize();
+  hinges.push({side,b,rest:b.quaternion.clone(),axisLocal,upperDir,foreDir});
+ }
+ const old=$('status').textContent;
+ $('status').textContent=old+` · ${hinges.length} Ellenbogengelenke bereit`;
+}
+function setAngle(deg){
+ $('angle').value=String(Math.round(deg));$('degrees').textContent=Math.round(deg)+'°';
+ for(const h of hinges){
+  const enabled=$(h.side==='L'?'left':'right').checked;
+  // Die Rotation wird auf die unveränderte Bind-Pose angewandt.
+  const rotation=new THREE.Quaternion().setFromAxisAngle(h.axisLocal,THREE.MathUtils.degToRad(enabled?deg:0));
+  h.b.quaternion.copy(rotation.multiply(h.rest));
+ }
+ if(model)model.updateMatrixWorld(true);
+}
+$('angle').oninput=()=>{playing=false;$('play').textContent='▶ Animation starten';setAngle(Number($('angle').value))};
+$('left').onchange=$('right').onchange=()=>setAngle(Number($('angle').value));
+$('play').onclick=()=>{playing=!playing;$('play').textContent=playing?'⏸ Animation pausieren':'▶ Animation starten';lastTime=performance.now()};
+$('reset').onclick=()=>{playing=false;$('play').textContent='▶ Animation starten';setAngle(0)};
+
 $('bone').onchange=analyze;
 $('skeleton').onchange=()=>{if(helper)helper.visible=$('skeleton').checked};
 $('front').onclick=fit;
@@ -105,5 +139,5 @@ $('side').onclick=()=>{fit();const d=camera.position.distanceTo(controls.target)
 $('copy').onclick=async()=>{try{await navigator.clipboard.writeText(diagnosis);$('status').textContent='Diagnose kopiert – hier im Chat einfügen.'}catch(e){$('status').textContent='Kopieren blockiert: Diagnose unten markieren und kopieren.'}};
 function resize(){const w=$('view').clientWidth,h=$('view').clientHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix()}
 new ResizeObserver(resize).observe($('view'));resize();
-renderer.setAnimationLoop(()=>{controls.update();renderer.render(scene,camera)});
+renderer.setAnimationLoop((t)=>{if(playing&&hinges.length){const dt=Math.min((t-lastTime)/1000,.1);phase+=dt*1.6;setAngle((1-Math.cos(phase))*52.5)}lastTime=t;controls.update();renderer.render(scene,camera)});
 </script></body></html>
