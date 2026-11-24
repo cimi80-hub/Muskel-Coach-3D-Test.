@@ -7,9 +7,9 @@ if (!isMuskelTestOrigin(self.location)) {
 
 const scope = self.registration.scope;
 const section = 'muskel-coach-test:' + scope + ':';
-const cacheName = section + 'v1';
+const cacheName = section + 'v2';
 const appFiles = [
-  './', 'index.html', 'test-environment.js', 'test-bootstrap.js', 'test-app.js',
+  './', 'test-environment.js', 'test-bootstrap.js', 'test-app.js',
   'manifest.webmanifest', 'icon-180.png', 'icon-192.png', 'icon-512.png',
 ];
 const staticUrls = new Set(appFiles.map(file => new URL(file, scope).href));
@@ -39,6 +39,8 @@ self.addEventListener('fetch', event => {
   const key = new URL(url.href);
   key.search = '';
   key.hash = '';
+  // Pages redirects index.html to the directory URL.
+  if (key.href === new URL('index.html', scope).href) key.href = scope;
   if (!staticUrls.has(key.href)) return;
 
   event.respondWith(fetch(request).catch(async () =>

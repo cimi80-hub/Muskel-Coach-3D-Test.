@@ -11,7 +11,8 @@ from urllib.parse import urlsplit
 
 from playwright.sync_api import sync_playwright
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(os.environ.get('MUSKEL_TEST_ROOT', Path(__file__).resolve().parents[1]))
+PAGES_REDIRECT = os.environ.get('MUSKEL_PAGES_REDIRECT') == '1'
 FILES = {'/', '/index.html', '/test-sw.js', '/manifest.webmanifest',
          '/test-app.js', '/test-bootstrap.js', '/test-environment.js', '/icon-180.png', '/icon-192.png', '/icon-512.png'}
 
@@ -22,9 +23,13 @@ class App(SimpleHTTPRequestHandler):
             self.send_error(403)
         elif urlsplit(self.path).path not in FILES:
             self.send_error(404)
+        elif self.path == '/index.html' and PAGES_REDIRECT:
+            self.send_response(308)
+            self.send_header('Location', '/')
+            self.end_headers()
         elif self.path == '/test-sw.js' and self.server.update:
             # Simuliert neue SW-Bytes ausschließlich in dieser HTTP-Antwort.
-            body = (ROOT / 'test-sw.js').read_bytes().replace(b"section + 'v1'", b"section + 'v2'")
+            body = (ROOT / 'test-sw.js').read_bytes().replace(b"section + 'v2'", b"section + 'v3'")
             self.send_response(200)
             self.send_header('Content-Type', 'text/javascript')
             self.send_header('Content-Length', str(len(body)))
@@ -212,8 +217,8 @@ def cache_isolation_preserved(page):
     return page.evaluate('''async () => {
         const scope = (await navigator.serviceWorker.ready).scope;
         return await caches.has('muskel-coach-v67') &&
-          await caches.has('muskel-coach-test:' + scope + ':v2') &&
-          !(await caches.has('muskel-coach-test:' + scope + ':v1'));
+          await caches.has('muskel-coach-test:' + scope + ':v3') &&
+          !(await caches.has('muskel-coach-test:' + scope + ':v2'));
     }''')
 
 
